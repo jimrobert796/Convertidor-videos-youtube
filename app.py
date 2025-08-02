@@ -113,4 +113,5 @@ def download_audio():
 
 # Ejecutar la aplicación en modo debug
 if __name__ == "__main__":
-    app.run(debug=True)  # Ejecuta Flask con depuración activada
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port)  # Ejecuta el puerto para Render host gratis para proyectos basicos
