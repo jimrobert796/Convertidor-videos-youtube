@@ -45,7 +45,8 @@ def get_info():
             "socket_timeout": 30,
             "noplaylist": True,
             "cachedir": False,
-            "geo_bypass": True
+            "geo_bypass": True,
+            "cookiefile": "cookies.txt"  # <-- Aquí la ruta a tu archivo de cookies
         }
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
@@ -83,7 +84,8 @@ def download_audio():
                     "socket_timeout": 30,
                     "noplaylist": True,
                     "cachedir": False,
-                    "geo_bypass": True
+                    "geo_bypass": True,
+                    "cookiefile": "cookies.txt"  # <-- Aquí la ruta a tu archivo de cookies
                 }
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(url)
