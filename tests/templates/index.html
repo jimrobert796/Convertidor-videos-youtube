@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Descargador MP3</title>
+</head>
+<body>
+    <h1>Convertidor YouTube a MP3</h1>
+
+    {% if error %}
+        <p style="color:red;">Error: {{ error }}</p>
+    {% endif %}
+
+    <form action="/download" method="POST">
+        <input type="text" name="url" placeholder="Pega aquí el enlace de YouTube" required>
+        <button type="submit">Descargar MP3</button>
+    </form>
+</body>
+</html>

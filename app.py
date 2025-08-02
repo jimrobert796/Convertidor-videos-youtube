@@ -1,9 +1,13 @@
-# Importación de librerías necesarias
+#Importación de librerías necesarias
 # Flask y funciones útiles
 from flask import Flask, render_template, request, jsonify, send_file
 
 # Youtube
-import yt_dlp
+from pytubefix import YouTube  # Objeto principal para trabajar con videos de YouTube
+# Función para mostrar progreso de descarga
+from pytubefix.cli import on_progress
+from pytubefix.exceptions import PytubeFixError  # Manejo de errores específicos
+
 # Archivos y audios
 import ffmpeg  # Para manejar ffmpeg desde Python
 import tempfile
@@ -37,25 +41,14 @@ def get_info():
         # Devuelve error si no hay URL
         return jsonify({"error": "No se proporcionó URL"}), 400
     try:
-        ydl_opts = {
-            "quiet": True,
-            "skip_download": True,
-            "forcejson": True,
-            "retries": 5,
-            "socket_timeout": 30,
-            "noplaylist": True,
-            "cachedir": False,
-            "geo_bypass": True,
-            "cookiefile": "cookies.txt"  # <-- Aquí la ruta a tu archivo de cookies
+        yt = YouTube(url)  # Sino crea objeto YouTube
+        info = {
+            "title": yt.title,  # Título del video
+            "author": yt.author,  # Autor del video
+            "thumbnail_url": yt.thumbnail_url,  # URL de miniatura
+            "length": yt.length,  # Duración en segundos
         }
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=False)
-            return jsonify({
-                "title": info.get("title"),
-                "author": info.get("uploader"),
-                "thumbnail_url": info.get("thumbnail"),
-                "length": info.get("duration")
-            })# Envía datos como respuesta JSON
+        return jsonify(info)  # Envía datos como respuesta JSON
     except Exception as e:
         return jsonify({"error": str(e)}), 500  # Devuelve error si falla algo
 
@@ -68,54 +61,35 @@ def download_audio():
     if not url:
         return "Error: No URL provided", 400  # Verifica que haya URL
     try:
-        
+        # Crea el objeto YouTube
+        yt = YouTube(url, on_progress_callback=on_progress)
+
+        # Obtiene la mejor calidad de solo audio
+        audio_stream = yt.streams.filter(
+            only_audio=True).order_by("abr").desc().first()
+        if not audio_stream:
+            return "No audio stream found", 400  # Si no hay audio, muestra error
+
         # Crea una carpeta temporal invisible para descargar y trabajar con los archivos
         with tempfile.TemporaryDirectory() as tmpdir:
             # Ruta para archivo original
             audio_path = os.path.join(tmpdir, "audio.webm")
             # Ruta para archivo convertido
             mp3_path = os.path.join(tmpdir, "audio.mp3")
-            
-            ydl_opts = {
-                    "format": "bestaudio/best",
-                    "outtmpl": audio_path,
-                    "quiet": True,
-                    "retries": 5,
-                    "socket_timeout": 30,
-                    "noplaylist": True,
-                    "cachedir": False,
-                    "geo_bypass": True,
-                    "cookiefile": "cookies.txt"  # <-- Aquí la ruta a tu archivo de cookies
-                }
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(url)
-                title = info.get("title")
-                author = info.get("uploader")
-                thumbnail_url = info.get("thumbnail")
-                
-            # Validar que el archivo de audio se descargó
-            if not os.path.exists(audio_path):
-                return "Error: No se descargó el archivo de audio", 500
-                
+
+            # Descarga el audio en formato webm s
+            audio_stream.download(output_path=tmpdir, filename="audio.webm")
+
             # Convertir audio a mp3 usando ffmpeg-python
-            try:
-                (
-                    ffmpeg
-                    .input(audio_path)
-                    .output(mp3_path, format='mp3', audio_bitrate='192k', ar='44100')
-                    .run(overwrite_output=True, capture_stdout=True, capture_stderr=True)
-                )
-            except ffmpeg.Error as fferr:
-                return f"Error en conversión con ffmpeg: {fferr.stderr.decode()}", 500
-            
-            # Validar archivo mp3
-            if not os.path.exists(mp3_path) or os.path.getsize(mp3_path) < 1000:
-                return "Error: Falló la conversión a MP3 o archivo inválido", 500
-            
+            (
+                ffmpeg
+                .input(audio_path)
+                .output(mp3_path, format='mp3', audio_bitrate='192k', ar='44100')
+                .run(overwrite_output=True)
+            )
+
             # Descarga la miniatura del video
-            thumb_resp = requests.get(thumbnail_url)
-            if thumb_resp.status_code != 200:
-                return "Error al descargar la miniatura", 500
+            thumb_resp = requests.get(yt.thumbnail_url)
             image_data = thumb_resp.content
 
             # Detectar si la imagen es jpeg o png para definir mime-type correcto
@@ -139,8 +113,8 @@ def download_audio():
             ))
 
             # Agregar título y artista (autor) del video como etiquetas ID3
-            audio.tags.add(TIT2(encoding=3, text=title))  # Título
-            audio.tags.add(TPE1(encoding=3, text=author))  # Artista
+            audio.tags.add(TIT2(encoding=3, text=yt.title))  # Título
+            audio.tags.add(TPE1(encoding=3, text=yt.author))  # Artista
             audio.save(v2_version=3)
 
             # Abre el archivo y lo devuelve como descarga
@@ -149,7 +123,7 @@ def download_audio():
                     BytesIO(f.read()),  # Envía el archivo como flujo de bytes
                     as_attachment=True,  # Indica que es un archivo para descargar
                     # Nombre del archivo descargado
-                    download_name=f"{title}.mp3",
+                    download_name=f"{yt.title}.mp3",
                     mimetype="audio/mp3"  # Tipo MIME
                 )
     except Exception as e:
@@ -158,5 +132,4 @@ def download_audio():
 
 # Ejecutar la aplicación en modo debug
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8080))  # 8080 es fallback si no hay variable
-    app.run(host="0.0.0.0", port=port)
+    app.run(host="0.0.0.0", port=8080) # Prueba para fly.io
