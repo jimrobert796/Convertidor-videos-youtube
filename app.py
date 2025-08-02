@@ -7,6 +7,7 @@ from pytubefix.cli import on_progress  # Función para mostrar progreso de desca
 from pytubefix.exceptions import PytubeFixError  # Manejo de errores específicos
 
 # Archivos y audios
+import ffmpeg # Para manejar ffmpeg desde Python
 import tempfile, os, subprocess, requests  # Utilidades para manejar archivos, procesos y peticiones web
 from mutagen.mp3 import MP3  # Para manipular archivos MP3
 from mutagen.id3 import ID3, APIC, TIT2, TPE1  # Para editar etiquetas ID3 del MP3
@@ -66,10 +67,13 @@ def download_audio():
             # Descarga el audio en formato webm s
             audio_stream.download(output_path=tmpdir, filename="audio.webm")
 
-            # Usa ffmpeg para convertir el audio a mp3
-            subprocess.run([
-                "ffmpeg", "-i", audio_path, "-vn", "-ab", "192k", "-ar", "44100", "-y", mp3_path
-            ], check=True)
+            # Convertir audio a mp3 usando ffmpeg-python
+            (
+                ffmpeg
+                .input(audio_path)
+                .output(mp3_path, format='mp3', audio_bitrate='192k', ar='44100')
+                .run(overwrite_output=True)
+            )
 
             # Descarga la miniatura del video
             thumb_resp = requests.get(yt.thumbnail_url)
