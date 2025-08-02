@@ -1,56 +1,62 @@
-from flask import Flask, render_template, request, send_file, redirect, url_for
-import yt_dlp
-import tempfile
-import os
-import io
+from flask import Flask, render_template, request, send_file, jsonify
+from yt_dlp import YoutubeDL
 import ffmpeg
+import tempfile
+import io
+import os
+
 
 app = Flask(__name__, template_folder='templates')
 
-@app.route('/')
-def index():
-    error = request.args.get("error")
-    return render_template('index.html', error=error)
 
-@app.route('/download', methods=['POST'])
+@app.route("/")
+def index():
+    return render_template("index.html")
+
+
+@app.route("/download", methods=["POST"])
 def download():
-    url = request.form.get('url')
+    url = request.form.get("url")
 
     if not url:
-        return redirect(url_for('index', error="No se proporcionó una URL"))
+        return jsonify({"error": "URL no proporcionada"}), 400
 
     try:
-        # Crear archivo temporal para el audio original (webm/m4a)
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".webm") as tmp_file:
-            original_audio_path = tmp_file.name
+        # Carpeta temporal en memoria
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Descarga del audio en formato bestaudio
+            ydl_opts = {
+                'format': 'bestaudio/best',
+                'outtmpl': os.path.join(tmpdir, 'audio.%(ext)s'),
+                'noplaylist': True,
+                'quiet': True
+            }
 
-        # Descargar el audio sin procesar
-        ydl_opts = {
-            'format': 'bestaudio/best',
-            'outtmpl': original_audio_path,
-            'quiet': True,
-        }
+            with YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=True)
+                input_audio_path = ydl.prepare_filename(info)
 
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=True)
-            title = info.get('title', 'audio') + '.mp3'
+            # Convertir a MP3 usando ffmpeg-python
+            output_io = io.BytesIO()
+            stream = ffmpeg.input(input_audio_path)
+            stream = ffmpeg.output(stream, 'pipe:', format='mp3', audio_bitrate='192k')
+            out, _ = ffmpeg.run(stream, capture_stdout=True, capture_stderr=True)
+            output_io.write(out)
+            output_io.seek(0)
 
-        # Convertir a mp3 usando ffmpeg-python, en memoria
-        mp3_data = io.BytesIO()
+            # Nombre del archivo
+            filename = f"{info.get('title', 'audio')}.mp3"
 
-        stream = ffmpeg.input(original_audio_path)
-        stream = ffmpeg.output(stream, 'pipe:1', format='mp3', acodec='libmp3lame', audio_bitrate='192k')
-        out, err = ffmpeg.run(stream, capture_stdout=True, capture_stderr=True)
-        mp3_data.write(out)
-        mp3_data.seek(0)
-
-        # Borrar archivo temporal original
-        os.remove(original_audio_path)
-
-        return send_file(mp3_data, as_attachment=True, download_name=title, mimetype='audio/mpeg')
+            return send_file(
+                output_io,
+                mimetype="audio/mpeg",
+                as_attachment=True,
+                download_name=filename
+            )
 
     except Exception as e:
-        return redirect(url_for('index', error=str(e)))
+        return jsonify({"error": str(e)}), 500
 
-if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+
+if __name__ == "__main__":
+    app.run(debug=True)

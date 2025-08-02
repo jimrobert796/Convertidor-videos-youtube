@@ -2,17 +2,12 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Descargador MP3</title>
+    <title>Descargar MP3 de YouTube</title>
 </head>
 <body>
     <h1>Convertidor YouTube a MP3</h1>
-
-    {% if error %}
-        <p style="color:red;">Error: {{ error }}</p>
-    {% endif %}
-
-    <form action="/download" method="POST">
-        <input type="text" name="url" placeholder="Pega aquí el enlace de YouTube" required>
+    <form action="/download" method="post">
+        <input type="text" name="url" placeholder="Pega la URL de YouTube aquí" required>
         <button type="submit">Descargar MP3</button>
     </form>
 </body>
