@@ -2,103 +2,80 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Convertidor YouTube a MP3</title>
-    <!-- Enlace al archivo CSS para estilos (opcional, se guarda en /static/style.css) -->
+    <title>Convertidor YouTube</title>
     <link rel="stylesheet" href="/static/style.css">
 </head>
-
-
-
 <body>
 
-    <!-- Título principal -->
-    <h1>Convertidor YouTube a MP3</h1>
+    <h1>Convertidor YouTube</h1>
 
-    <!-- Campo donde el usuario pega la URL del video -->
     <input type="text" id="urlInput" placeholder="Pega la URL de YouTube">
     <br>
-
-    <!-- Botón que al hacer clic inicia el proceso de conversión -->
     <button id="btnConvert">Convertir</button>
 
-    <!-- Aquí se mostrará el error si ocurre -->
     <p id="errorMsg"></p>
 
-    <!-- Contenedor de información del video, oculto al principio -->
     <div id="info" style="display: none;">
-        
-        <!-- Información textual del video -->
         <div class="text-info">
-            <h2 id="titulo"></h2> <!-- Título del video -->
+            <h2 id="titulo"></h2>
             <p><strong>Autor:</strong> <span id="author"></span></p>
             <p><strong>Duración:</strong> <span id="duracion"></span> segundos</p>
 
-            <!-- Formulario que envía la URL al backend para descargar el MP3 -->
-            <form id="downloadForm" method="POST" action="/download">
-                <!-- Campo oculto que guarda la URL para el backend la descarga con el id url -->
-                <input type="hidden" name="url" id="urlHidden">
-                <!-- Botón para descargar el MP3 -->
+            <!-- Botones de descarga -->
+            <form method="POST" action="/download_mp3">
+                <input type="hidden" name="url" id="urlMp3">
                 <button type="submit">Descargar MP3</button>
+            </form>
+
+            <form method="POST" action="/download_mp4">
+                <input type="hidden" name="url" id="urlMp4">
+                <button type="submit">Descargar MP4</button>
             </form>
         </div>
 
-        <!-- Miniatura del video -->
         <div class="thumbnail-container">
-            <img id="thumbnail" src="" alt="Miniatura del 8">
+            <img id="thumbnail" src="" alt="Miniatura del video">
         </div>
     </div>
 
-    <!-- Script que maneja la lógica del botón "Convertir" -->
     <script>
         document.getElementById("btnConvert").addEventListener("click", async () => {
-            // Obtener la URL ingresada
             const url = document.getElementById("urlInput").value.trim();
-
-            // Referencias a elementos HTML
             const errorMsg = document.getElementById("errorMsg");
             const infoDiv = document.getElementById("info");
 
-            // Limpiar mensajes y ocultar contenedor
             errorMsg.textContent = "";
             infoDiv.style.display = "none";
 
-            // Validar que se haya ingresado una URL
             if (!url) {
                 errorMsg.textContent = "Por favor ingresa una URL.";
                 return;
             }
 
             try {
-                // Hacer una petición POST al backend Flask para obtener info del video
                 const response = await fetch("/info", {
                     method: "POST",
-                    headers: {
-                        "Content-Type": "application/json"
-                    },
-                    body: JSON.stringify({ url }) // Enviar la URL como JSON
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ url })
                 });
 
                 const data = await response.json();
 
-                // Si hubo un error en la respuesta del servidor
                 if (data.error) {
                     errorMsg.textContent = data.error;
                     return;
                 }
 
-                // Mostrar información del video en los elementos HTML
                 document.getElementById("titulo").textContent = data.title;
                 document.getElementById("author").textContent = data.author;
                 document.getElementById("duracion").textContent = data.length;
                 document.getElementById("thumbnail").src = data.thumbnail_url;
 
-                // Pasar la URL al formulario oculto para la descarga
-                document.getElementById("urlHidden").value = url;
+                document.getElementById("urlMp3").value = url;
+                document.getElementById("urlMp4").value = url;
 
-                // Mostrar el contenedor de info
-                infoDiv.style.display = "flex"; // Asegúrate que en CSS esté definido como flex
+                infoDiv.style.display = "flex";
             } catch (err) {
-                // Error de conexión u otro problema
                 errorMsg.textContent = "Error al obtener información.";
                 console.error(err);
             }
@@ -106,4 +83,4 @@
     </script>
 
 </body>
-</html> QUIERO QUE EL PRIMER BOTON SEA DESCARGA DIRECTA
+</html>
